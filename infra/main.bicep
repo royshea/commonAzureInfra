@@ -1,10 +1,8 @@
-targetScope = 'subscription'
+// Deploys shared platform resources into an existing resource group.
+// The resource group (rg-shared-platform) is created once via CLI; this template manages its contents.
 
 @description('Azure region for all resources')
 param location string = 'westus3'
-
-@description('Name of the shared resource group')
-param resourceGroupName string = 'rg-shared-platform'
 
 @description('Name prefix for resources')
 param namePrefix string = 'hobby'
@@ -30,14 +28,7 @@ param tags object = {
   managedBy: 'bicep'
 }
 
-resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
-  name: resourceGroupName
-  location: location
-  tags: tags
-}
-
 module logAnalytics 'modules/log-analytics.bicep' = {
-  scope: rg
   name: 'log-analytics'
   params: {
     name: 'law-${namePrefix}'
@@ -47,7 +38,6 @@ module logAnalytics 'modules/log-analytics.bicep' = {
 }
 
 module storage 'modules/storage.bicep' = {
-  scope: rg
   name: 'storage'
   params: {
     name: storageAccountName
@@ -59,7 +49,6 @@ module storage 'modules/storage.bicep' = {
 }
 
 module appServicePlan 'modules/app-service-plan.bicep' = {
-  scope: rg
   name: 'app-service-plan'
   params: {
     name: 'asp-${namePrefix}'
@@ -70,7 +59,6 @@ module appServicePlan 'modules/app-service-plan.bicep' = {
 }
 
 module openai 'modules/openai.bicep' = {
-  scope: rg
   name: 'openai'
   params: {
     name: 'aoai-${namePrefix}'
@@ -81,7 +69,6 @@ module openai 'modules/openai.bicep' = {
 }
 
 module appInsights 'modules/app-insights.bicep' = {
-  scope: rg
   name: 'app-insights'
   params: {
     name: 'appi-${namePrefix}'
@@ -90,9 +77,6 @@ module appInsights 'modules/app-insights.bicep' = {
     logAnalyticsWorkspaceId: logAnalytics.outputs.id
   }
 }
-
-@description('Resource group name')
-output resourceGroupName string = rg.name
 
 @description('Storage account name')
 output storageAccountName string = storage.outputs.storageAccountName

@@ -1,7 +1,6 @@
 using 'main.bicep'
 
 param location = 'westus3'
-param resourceGroupName = 'rg-shared-platform'
 param namePrefix = 'hobby'
 param storageAccountName = 'sthobbyshared'
 param appServicePlanSku = 'B1'

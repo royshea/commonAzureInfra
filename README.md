@@ -14,7 +14,7 @@ Shared infrastructure and standards for deploying multiple hobby projects to Azu
 
 ```
 ├── infra/                  # Bicep templates for shared platform resources
-│   ├── main.bicep          # Orchestrator (subscription-scoped)
+│   ├── main.bicep          # Orchestrator (resource-group scoped)
 │   ├── main.bicepparam     # Parameter values
 │   └── modules/            # Reusable Bicep modules (copied into project repos)
 ├── templates/              # GitHub Actions workflow templates (copied into project repos)
@@ -34,22 +34,36 @@ Each project repo contains its own `infra/` directory with Bicep templates that 
 
 ## Getting started
 
-### Initial setup (one-time)
+### Bootstrap (one-time manual steps)
 
-1. **Deploy shared infrastructure** — Deploys the resource group, App Service Plan, Storage Account, and other shared resources:
+The resource group must be created manually before the CI/CD pipeline can deploy into it. This is intentional — the pipeline only has Contributor access scoped to this resource group, not the full subscription.
+
+1. **Create the shared resource group:**
    ```bash
-   az deployment sub create \
-     --location <region> \
-     --name shared-infra-initial \
+   az group create --name rg-shared-platform --location westus3
+   ```
+
+2. **Deploy shared infrastructure** into the resource group:
+   ```bash
+   az deployment group create \
+     --resource-group rg-shared-platform \
      --template-file infra/main.bicep \
      --parameters infra/main.bicepparam
    ```
 
-2. **Set up GitHub OIDC** — Create an Azure AD app registration with federated credentials so GitHub Actions can deploy without stored secrets. See [Setup GitHub OIDC Federation](docs/new-project-guide.md#setup-github-oidc-federation) for detailed steps.
+3. **Set up GitHub OIDC** — Create an Azure AD app registration, service principal, and federated credentials so GitHub Actions can deploy without stored secrets. See [Setup GitHub OIDC Federation](docs/new-project-guide.md#setup-github-oidc-federation) for detailed steps.
 
-3. **Add GitHub secrets** to this repo: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+4. **Grant the service principal Contributor on the resource group:**
+   ```bash
+   az role assignment create \
+     --assignee <app-id> \
+     --role "Contributor" \
+     --scope /subscriptions/<subscription-id>/resourceGroups/rg-shared-platform
+   ```
 
-After this, any push to `main` that changes `infra/` will automatically redeploy the shared infrastructure.
+5. **Add GitHub secrets** to this repo: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+
+After this, any push to `main` that changes `infra/` will automatically redeploy the shared infrastructure via the GitHub Actions workflow. The workflow includes a what-if preview step before deploying.
 
 ### Adding a project
 
