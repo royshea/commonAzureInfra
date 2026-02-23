@@ -1,0 +1,14 @@
+# Local-only files (not committed to git)
+local/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Azurite data
+azurite-data/
+
+# OS files
+Thumbs.db
+.DS_Store
