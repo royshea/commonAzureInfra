@@ -27,15 +27,6 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Preview changes (What-If)
-        uses: azure/CLI@v2
-        with:
-          inlineScript: |
-            az deployment sub what-if \
-              --location westus3 \
-              --template-file infra/main.bicep \
-              --parameters infra/main.bicepparam
-
       - name: Deploy Bicep
         uses: azure/arm-deploy@v2
         with:

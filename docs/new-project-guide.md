@@ -277,14 +277,14 @@ This eliminates the need for stored Azure credentials in GitHub secrets.
    az ad sp create --id <app-id>
    ```
 
-3. **Assign Contributor role** (scoped to the shared resource group, not the entire subscription):
+3. **Assign Contributor role** (scoped to the resource group only — not the subscription):
    ```bash
    az role assignment create \
      --assignee <app-id> \
      --role "Contributor" \
      --scope /subscriptions/<subscription-id>/resourceGroups/rg-shared-platform
    ```
-   Contributor covers both infrastructure deployment (Bicep) and app code deployment.
+   This covers both infrastructure deployment (Bicep) and app code deployment within the shared resource group.
 
 4. **Add federated credential for each repo:**
    ```bash
