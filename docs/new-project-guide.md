@@ -48,7 +48,7 @@ param storageAccountName string = ''
 @description('Resource ID of the shared OpenAI account (if needed)')
 param openaiAccountId string = ''
 
-param location string = 'westus2'
+param location string = 'westus3'
 
 module webApp 'modules/web-app.bicep' = {
   name: 'web-app'

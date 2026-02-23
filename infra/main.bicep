@@ -1,7 +1,7 @@
 targetScope = 'subscription'
 
 @description('Azure region for all resources')
-param location string = 'westus2'
+param location string = 'westus3'
 
 @description('Name of the shared resource group')
 param resourceGroupName string = 'rg-shared-platform'
@@ -12,11 +12,11 @@ param namePrefix string = 'hobby'
 @description('Storage account name (3-24 chars, lowercase alphanumeric)')
 param storageAccountName string = 'st${namePrefix}shared'
 
-@description('Blob containers to create in the shared storage account')
-param blobContainers array = ['recipes']
+@description('Blob containers to create in the shared storage account (project-specific containers should be created in each project\'s own infra)')
+param blobContainers array = []
 
-@description('Tables to create in the shared storage account')
-param tableNames array = ['sensorreadings', 'conversations', 'messages']
+@description('Tables to create in the shared storage account (project-specific tables should be created in each project\'s own infra)')
+param tableNames array = []
 
 @description('App Service Plan SKU')
 param appServicePlanSku string = 'B1'
