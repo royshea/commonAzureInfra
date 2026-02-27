@@ -35,27 +35,38 @@ Each project manages its own Azure resources in its own repo. Copy the necessary
 
 3. Create `infra/main.bicep` for your project:
 
-```bicep
-@description('Resource ID of the shared App Service Plan')
-param appServicePlanId string
+> **Best practice:** Use the Bicep `existing` keyword to reference shared resources by name rather than hardcoding full resource IDs. This improves portability, readability, and ensures properties are resolved at deployment time. See [Bicep best practices](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/best-practices) and [existing keyword](https://learn.microsoft.com/en-us/azure/azure-resource-manager/bicep/existing-resource) for details.
 
-@description('Resource ID of the shared Storage Account (if needed)')
-param storageAccountId string = ''
+```bicep
+@description('Name of the shared App Service Plan')
+param appServicePlanName string
 
 @description('Name of the shared Storage Account (if needed)')
 param storageAccountName string = ''
 
-@description('Resource ID of the shared OpenAI account (if needed)')
-param openaiAccountId string = ''
+@description('Name of the shared OpenAI account (if needed)')
+param openaiAccountName string = ''
 
 param location string = 'westus3'
+
+resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' existing = {
+  name: appServicePlanName
+}
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = if (!empty(storageAccountName)) {
+  name: storageAccountName
+}
+
+resource openaiAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = if (!empty(openaiAccountName)) {
+  name: openaiAccountName
+}
 
 module webApp 'modules/web-app.bicep' = {
   name: 'web-app'
   params: {
     name: 'app-<yourproject>'
     location: location
-    appServicePlanId: appServicePlanId
+    appServicePlanId: appServicePlan.id
     linuxFxVersion: 'PYTHON|3.13'                                    // or NODE|22-lts
     startupCommand: 'gunicorn --bind=0.0.0.0 --timeout 600 app:app'  // adjust per project
     projectName: '<yourproject>'
@@ -70,34 +81,33 @@ module webApp 'modules/web-app.bicep' = {
 }
 
 // Grant Managed Identity access to shared storage
-module storageAccess 'modules/storage-rbac.bicep' = if (!empty(storageAccountId)) {
+module storageAccess 'modules/storage-rbac.bicep' = if (!empty(storageAccountName)) {
   name: 'storage-rbac'
   params: {
     principalId: webApp.outputs.principalId
-    storageAccountId: storageAccountId
+    storageAccountId: storageAccount.id
     accessType: 'table'  // or 'blob', 'queue', 'both', or 'all'
   }
 }
 
 // Grant Managed Identity access to shared OpenAI
-module openaiAccess 'modules/openai-rbac.bicep' = if (!empty(openaiAccountId)) {
+module openaiAccess 'modules/openai-rbac.bicep' = if (!empty(openaiAccountName)) {
   name: 'openai-rbac'
   params: {
     principalId: webApp.outputs.principalId
-    openaiAccountId: openaiAccountId
+    openaiAccountId: openaiAccount.id
   }
 }
 ```
 
-4. Create `infra/main.bicepparam` with the shared resource IDs:
+4. Create `infra/main.bicepparam` with the shared resource names:
 
 ```bicep
 using 'main.bicep'
 
-param appServicePlanId = '<asp-hobby-resource-id>'
-param storageAccountId = '<sthobbyshared-resource-id>'
+param appServicePlanName = 'asp-hobby'
 param storageAccountName = 'sthobbyshared'
-param openaiAccountId = '<aoai-hobby-resource-id>'
+param openaiAccountName = 'aoai-hobby'
 ```
 
 ### Deploy your project's infra
