@@ -68,7 +68,7 @@ module webApp 'modules/web-app.bicep' = {
     location: location
     appServicePlanId: appServicePlan.id
     linuxFxVersion: 'PYTHON|3.13'                                    // or NODE|22-lts
-    startupCommand: 'gunicorn --bind=0.0.0.0 --timeout 600 app:app'  // adjust per project
+    startupCommand: 'gunicorn --bind=0.0.0.0 --timeout 600 app:app'  // Python; use 'node server.js' for static sites
     projectName: '<yourproject>'
     healthCheckPath: '/health'
     appSettings: [
@@ -364,13 +364,14 @@ project-root/
 │       └── deploy-app.yml    # Deploys app code on source changes
 ├── infra/
 │   ├── main.bicep            # Project's Azure resources
-│   ├── main.bicepparam       # Shared resource IDs
+│   ├── main.bicepparam       # Shared resource names
 │   └── modules/
 │       ├── web-app.bicep     # Copied from azure/infra/modules/
 │       ├── storage-rbac.bicep
 │       └── openai-rbac.bicep
 ├── src/                      # Application source
 ├── .env.example              # Environment variable template
+├── server.js                 # Express static server (if Node/static)
 ├── requirements.in           # Python dependency ranges (if Python)
 ├── requirements.txt          # Locked Python deps (if Python)
 ├── package.json              # Node deps (if Node/static)

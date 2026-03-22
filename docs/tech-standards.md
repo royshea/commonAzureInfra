@@ -199,7 +199,43 @@ Do **not** use exact pins (`==`) in `requirements.in` unless there's a known com
 
 **Astro** is the standard for content-focused static sites (blogs, documentation). It produces zero-JS static HTML by default and supports Markdown content natively. React components can be embedded when interactivity is needed.
 
-### Project Structure
+#### Production Serving with Express
+
+Static sites on the shared platform run on App Service with the Node runtime. Since App Service's built-in `pm2 serve` does not handle directory index resolution (e.g., `/about/` → `about/index.html`), all static sites must include a minimal Express server.
+
+Add `express` as a dependency and create a `server.js` at the project root:
+
+```js
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(express.static(path.join(__dirname, 'dist')));
+
+app.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, 'dist', '404.html'));
+});
+
+app.listen(port, () => {
+  console.log(`Serving on port ${port}`);
+});
+```
+
+Set the Bicep startup command to `node server.js` and `alwaysOn: false` (static sites don't need to stay warm). Add a `start` script to `package.json`:
+
+```json
+"scripts": {
+  "start": "node server.js"
+}
+```
+
+> **Why Express over pm2 serve?** `pm2 serve` is a minimal static file server that does not resolve `index.html` in subdirectories, causing `EISDIR` errors for multi-page static sites. Express's `express.static()` middleware is production-hardened and handles directory indexes, MIME types, and caching out of the box. This parallels how Python projects use gunicorn — a real production server rather than a built-in dev tool.
+
+### Project Structure (React / Vite)
 
 ```
 project-root/
@@ -269,6 +305,7 @@ These are point-in-time recommendations. Update to the latest stable versions wh
 | vite | ^6.3.0 | |
 | @vitejs/plugin-react | ^4.3.0 | |
 | eslint | ^9.22.0 | Flat config format. |
+| express | ^5.1.0 | Production static file server for Astro/static sites on App Service. |
 
 ---
 

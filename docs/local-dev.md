@@ -85,9 +85,12 @@ Projects: ambleramble, metronome, guitarPractice
 
 ```bash
 npm install
-npm run dev    # Starts dev server with hot reload
+npm run dev    # Starts Astro/Vite dev server with hot reload
 npm run build  # Produces production build in dist/ or build/
+npm start      # Runs the Express production server locally (serves dist/)
 ```
+
+Use `npm run dev` for day-to-day development. Use `npm run build && npm start` to test the production server (`server.js`) locally before deploying — this matches what runs on App Service.
 
 ## C# Azure Functions (Backend)
 
