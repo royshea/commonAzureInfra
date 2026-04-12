@@ -125,7 +125,7 @@ param appServicePlanName = 'asp-hobby'
 param storageAccountName = 'sthobbyshared'
 param openaiAccountName = 'aoai-hobby'
 param appInsightsName = 'appi-hobby'
-param actionGroupName = 'ag-hobby-email'
+param actionGroupName = 'ag-hobby-alerts'
 ```
 
 ### Deploy your project's infra
@@ -281,7 +281,7 @@ az webapp config appsettings set \
 
 ## Step 6: Set Up Monitoring
 
-All projects should connect to the shared Application Insights (`appi-hobby`) and define metric alerts against the shared Action Group (`ag-hobby-email`).
+All projects should connect to the shared Application Insights (`appi-hobby`) and define metric alerts against the shared Action Group (`ag-hobby-alerts`).
 
 ### Application Insights
 
