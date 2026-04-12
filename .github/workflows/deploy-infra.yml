@@ -31,12 +31,15 @@ jobs:
             az deployment group what-if \
               --resource-group rg-shared-platform \
               --template-file infra/main.bicep \
-              --parameters infra/main.bicepparam
+              --parameters infra/main.bicepparam \
+              --parameters actionGroupEmailReceivers='${{ secrets.ALERT_EMAIL_RECEIVERS }}'
 
       - name: Deploy Bicep
         uses: azure/arm-deploy@v2
         with:
           resourceGroupName: rg-shared-platform
           template: infra/main.bicep
-          parameters: infra/main.bicepparam
+          parameters: >
+            infra/main.bicepparam
+            actionGroupEmailReceivers=${{ secrets.ALERT_EMAIL_RECEIVERS }}
           deploymentName: shared-infra-${{ github.run_number }}

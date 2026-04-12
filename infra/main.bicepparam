@@ -20,3 +20,7 @@ param openaiDeployments = [
     capacity: 8
   }
 ]
+
+// Email receivers are passed via pipeline secret to keep PII out of the public repo.
+// Deploy with: --parameters actionGroupEmailReceivers='[{"name":"owner","emailAddress":"<your-email>"}]'
+param actionGroupEmailReceivers = []

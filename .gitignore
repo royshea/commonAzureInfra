@@ -6,6 +6,9 @@ local/
 .env.local
 .env.*.local
 
+# Compiled ARM templates (Bicep is the source of truth)
+infra/**/*.json
+
 # Azurite data
 azurite-data/
 

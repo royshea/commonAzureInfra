@@ -17,6 +17,16 @@ Shared infrastructure and standards for deploying multiple hobby projects to Azu
 │   ├── main.bicep          # Orchestrator (resource-group scoped)
 │   ├── main.bicepparam     # Parameter values
 │   └── modules/            # Reusable Bicep modules (copied into project repos)
+│       ├── action-group.bicep      # Alert notification Action Group
+│       ├── app-insights.bicep      # Application Insights
+│       ├── app-service-plan.bicep  # Shared App Service Plan
+│       ├── log-analytics.bicep     # Log Analytics workspace
+│       ├── openai.bicep            # Azure OpenAI
+│       ├── openai-rbac.bicep       # OpenAI RBAC assignments
+│       ├── storage.bicep           # Shared Storage Account
+│       ├── storage-rbac.bicep      # Storage RBAC assignments
+│       ├── web-app.bicep           # Web App
+│       └── function-app.bicep      # Function App
 ├── templates/              # GitHub Actions workflow templates (copied into project repos)
 ├── docs/                   # Guidance and setup instructions
 │   ├── new-project-guide.md    # Step-by-step: add a new project
@@ -29,6 +39,12 @@ Shared infrastructure and standards for deploying multiple hobby projects to Azu
 ## Architecture
 
 A single **App Service Plan (B1 Linux)** hosts all projects — static sites, Python web apps, React frontends, and Function App backends. Shared resources (Storage Account, Log Analytics, Application Insights, Azure OpenAI) live in one resource group.
+
+### Monitoring & alerting
+
+The shared infrastructure includes an **Action Group** (`ag-hobby-email`) that routes Azure Monitor alerts to email. Individual project repos define their own **metric alert rules** (e.g., HTTP 5xx, slow response, health check failures) and reference this shared Action Group by name. This keeps notification config centralized while alert logic stays with each app.
+
+The email receivers are stored as a GitHub secret (`ALERT_EMAIL_RECEIVERS`) rather than committed to the repo, since this is a public repository.
 
 Each project repo contains its own `infra/` directory with Bicep templates that reference the shared resources by ID. See [docs/new-project-guide.md](docs/new-project-guide.md) for the full pattern.
 
@@ -61,7 +77,14 @@ The resource group must be created manually before the CI/CD pipeline can deploy
      --scope /subscriptions/<subscription-id>/resourceGroups/rg-shared-platform
    ```
 
-5. **Add GitHub secrets** to this repo: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+5. **Add GitHub secrets** to this repo:
+
+   | Secret | Description |
+   |--------|-------------|
+   | `AZURE_CLIENT_ID` | App registration (service principal) client ID for OIDC |
+   | `AZURE_TENANT_ID` | Azure AD tenant ID |
+   | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
+   | `ALERT_EMAIL_RECEIVERS` | JSON array of alert recipients, e.g. `[{"name":"owner","emailAddress":"you@example.com"}]`. Kept as a secret to avoid committing PII to a public repo. |
 
 After this, any push to `main` that changes `infra/` will automatically redeploy the shared infrastructure via the GitHub Actions workflow. The workflow includes a what-if preview step before deploying.
 

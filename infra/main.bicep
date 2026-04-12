@@ -22,6 +22,9 @@ param appServicePlanSku string = 'B1'
 @description('Azure OpenAI model deployments')
 param openaiDeployments array = []
 
+@description('Email receivers for the shared alert action group: [{name, emailAddress}]')
+param actionGroupEmailReceivers array = []
+
 @description('Tags applied to all resources')
 param tags object = {
   project: 'shared'
@@ -78,6 +81,16 @@ module appInsights 'modules/app-insights.bicep' = {
   }
 }
 
+module actionGroup 'modules/action-group.bicep' = if (!empty(actionGroupEmailReceivers)) {
+  name: 'action-group'
+  params: {
+    name: 'ag-${namePrefix}-email'
+    tags: tags
+    groupShortName: take('${namePrefix}email', 12)
+    emailReceivers: actionGroupEmailReceivers
+  }
+}
+
 @description('Storage account name')
 output storageAccountName string = storage.outputs.storageAccountName
 
@@ -101,3 +114,6 @@ output appInsightsConnectionString string = appInsights.outputs.connectionString
 
 @description('Application Insights resource ID')
 output appInsightsId string = appInsights.outputs.id
+
+@description('Action Group name (empty string if not deployed)')
+output actionGroupName string = !empty(actionGroupEmailReceivers) ? actionGroup.outputs.name : ''
