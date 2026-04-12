@@ -41,5 +41,5 @@ jobs:
           template: infra/main.bicep
           parameters: >
             infra/main.bicepparam
-            actionGroupEmailReceivers=${{ secrets.ALERT_EMAIL_RECEIVERS }}
+            actionGroupEmailReceivers='${{ secrets.ALERT_EMAIL_RECEIVERS }}'
           deploymentName: shared-infra-${{ github.run_number }}

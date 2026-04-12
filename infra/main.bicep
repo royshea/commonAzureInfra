@@ -116,4 +116,4 @@ output appInsightsConnectionString string = appInsights.outputs.connectionString
 output appInsightsId string = appInsights.outputs.id
 
 @description('Action Group name (empty string if not deployed)')
-output actionGroupName string = !empty(actionGroupEmailReceivers) ? actionGroup.outputs.name : ''
+output actionGroupName string = !empty(actionGroupEmailReceivers) ? actionGroup!.outputs.name : ''
