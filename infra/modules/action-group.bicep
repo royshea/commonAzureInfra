@@ -1,4 +1,4 @@
-// module-version: 1.0
+// module-version: 1.1
 
 @description('Name of the Action Group resource')
 param name string
@@ -13,6 +13,9 @@ param groupShortName string
 @description('Email receivers: [{name, emailAddress}]')
 param emailReceivers array = []
 
+@description('SMS receivers: [{name, countryCode, phoneNumber}]')
+param smsReceivers array = []
+
 resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
   name: name
   location: 'global'
@@ -24,6 +27,11 @@ resource actionGroup 'Microsoft.Insights/actionGroups@2023-01-01' = {
       name: receiver.name
       emailAddress: receiver.emailAddress
       useCommonAlertSchema: true
+    }]
+    smsReceivers: [for receiver in smsReceivers: {
+      name: receiver.name
+      countryCode: receiver.countryCode
+      phoneNumber: receiver.phoneNumber
     }]
   }
 }

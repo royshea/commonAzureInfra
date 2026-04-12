@@ -42,7 +42,7 @@ A single **App Service Plan (B1 Linux)** hosts all projects — static sites, Py
 
 ### Monitoring & alerting
 
-The shared infrastructure includes **Application Insights** (`appi-hobby`) backed by **Log Analytics** (`law-hobby`) for per-request telemetry, and an **Action Group** (`ag-hobby-email`) that routes Azure Monitor alerts to email. A daily ingestion cap (default 100 MB/day) prevents cost surprises while staying well within the 5 GB/month free tier.
+The shared infrastructure includes **Application Insights** (`appi-hobby`) backed by **Log Analytics** (`law-hobby`) for per-request telemetry, and an **Action Group** (`ag-hobby-alerts`) that routes Azure Monitor alerts to email and SMS. A daily ingestion cap (default 100 MB/day) prevents cost surprises while staying well within the 5 GB/month free tier.
 
 Individual project repos wire up monitoring in two ways:
 
@@ -50,7 +50,7 @@ Individual project repos wire up monitoring in two ways:
 
 2. **Metric alert rules** — Each project defines its own alerts (e.g., HTTP 5xx, slow response, health check failures, data flow monitoring) and references the shared Action Group by name. Use `metricAlerts` for aggregate App Service metrics; use `scheduledQueryRules` for per-URL filtering against Application Insights.
 
-The email receivers are stored as a GitHub secret (`ALERT_EMAIL_RECEIVERS`) rather than committed to the repo, since this is a public repository.
+The email and SMS receivers are stored as GitHub secrets (`ALERT_EMAIL_RECEIVERS`, `ALERT_SMS_RECEIVERS`) rather than committed to the repo, since this is a public repository.
 
 Each project repo contains its own `infra/` directory with Bicep templates that reference the shared resources by ID. See [docs/new-project-guide.md](docs/new-project-guide.md) for the full pattern.
 
@@ -91,6 +91,7 @@ The resource group must be created manually before the CI/CD pipeline can deploy
    | `AZURE_TENANT_ID` | Azure AD tenant ID |
    | `AZURE_SUBSCRIPTION_ID` | Azure subscription ID |
    | `ALERT_EMAIL_RECEIVERS` | JSON array of alert recipients, e.g. `[{"name":"owner","emailAddress":"you@example.com"}]`. Kept as a secret to avoid committing PII to a public repo. |
+   | `ALERT_SMS_RECEIVERS` | JSON array of SMS recipients, e.g. `[{"name":"owner","countryCode":"1","phoneNumber":"5551234567"}]`. Kept as a secret to avoid committing PII to a public repo. |
 
 After this, any push to `main` that changes `infra/` will automatically redeploy the shared infrastructure via the GitHub Actions workflow. The workflow includes a what-if preview step before deploying.
 

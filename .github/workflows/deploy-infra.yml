@@ -32,7 +32,8 @@ jobs:
               --resource-group rg-shared-platform \
               --template-file infra/main.bicep \
               --parameters infra/main.bicepparam \
-              --parameters actionGroupEmailReceivers='${{ secrets.ALERT_EMAIL_RECEIVERS }}'
+              --parameters actionGroupEmailReceivers='${{ secrets.ALERT_EMAIL_RECEIVERS }}' \
+              --parameters actionGroupSmsReceivers='${{ secrets.ALERT_SMS_RECEIVERS }}'
 
       - name: Deploy Bicep
         uses: azure/CLI@v2
@@ -43,4 +44,5 @@ jobs:
               --template-file infra/main.bicep \
               --parameters infra/main.bicepparam \
               --parameters actionGroupEmailReceivers='${{ secrets.ALERT_EMAIL_RECEIVERS }}' \
+              --parameters actionGroupSmsReceivers='${{ secrets.ALERT_SMS_RECEIVERS }}' \
               --name shared-infra-${{ github.run_number }}

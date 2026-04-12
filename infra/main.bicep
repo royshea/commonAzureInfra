@@ -25,6 +25,9 @@ param openaiDeployments array = []
 @description('Email receivers for the shared alert action group: [{name, emailAddress}]')
 param actionGroupEmailReceivers array = []
 
+@description('SMS receivers for the shared alert action group: [{name, countryCode, phoneNumber}]')
+param actionGroupSmsReceivers array = []
+
 @description('Tags applied to all resources')
 param tags object = {
   project: 'shared'
@@ -81,13 +84,14 @@ module appInsights 'modules/app-insights.bicep' = {
   }
 }
 
-module actionGroup 'modules/action-group.bicep' = if (!empty(actionGroupEmailReceivers)) {
+module actionGroup 'modules/action-group.bicep' = if (!empty(actionGroupEmailReceivers) || !empty(actionGroupSmsReceivers)) {
   name: 'action-group'
   params: {
-    name: 'ag-${namePrefix}-email'
+    name: 'ag-${namePrefix}-alerts'
     tags: tags
-    groupShortName: take('${namePrefix}email', 12)
+    groupShortName: take('${namePrefix}alert', 12)
     emailReceivers: actionGroupEmailReceivers
+    smsReceivers: actionGroupSmsReceivers
   }
 }
 
@@ -116,4 +120,4 @@ output appInsightsConnectionString string = appInsights.outputs.connectionString
 output appInsightsId string = appInsights.outputs.id
 
 @description('Action Group name (empty string if not deployed)')
-output actionGroupName string = !empty(actionGroupEmailReceivers) ? actionGroup!.outputs.name : ''
+output actionGroupName string = (!empty(actionGroupEmailReceivers) || !empty(actionGroupSmsReceivers)) ? actionGroup!.outputs.name : ''
