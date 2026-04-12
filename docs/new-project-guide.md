@@ -47,6 +47,12 @@ param storageAccountName string = ''
 @description('Name of the shared OpenAI account (if needed)')
 param openaiAccountName string = ''
 
+@description('Name of the shared Application Insights resource')
+param appInsightsName string = ''
+
+@description('Name of the shared Action Group for alert notifications')
+param actionGroupName string = ''
+
 param location string = 'westus3'
 
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' existing = {
@@ -61,6 +67,10 @@ resource openaiAccount 'Microsoft.CognitiveServices/accounts@2024-10-01' existin
   name: openaiAccountName
 }
 
+resource appInsights 'Microsoft.Insights/components@2020-02-02' existing = if (!empty(appInsightsName)) {
+  name: appInsightsName
+}
+
 module webApp 'modules/web-app.bicep' = {
   name: 'web-app'
   params: {
@@ -71,12 +81,18 @@ module webApp 'modules/web-app.bicep' = {
     startupCommand: 'gunicorn --bind=0.0.0.0 --timeout 600 app:app'  // Python; use 'node server.js' for static sites
     projectName: '<yourproject>'
     healthCheckPath: '/health'
-    appSettings: [
+    appSettings: concat([
       {
         name: 'AZURE_STORAGE_ACCOUNT_NAME'
         value: storageAccountName
       }
-    ]
+    #disable-next-line BCP318
+    ], !empty(appInsightsName) ? [
+      {
+        name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+        value: appInsights.properties.ConnectionString
+      }
+    ] : [])
   }
 }
 
@@ -108,6 +124,8 @@ using 'main.bicep'
 param appServicePlanName = 'asp-hobby'
 param storageAccountName = 'sthobbyshared'
 param openaiAccountName = 'aoai-hobby'
+param appInsightsName = 'appi-hobby'
+param actionGroupName = 'ag-hobby-email'
 ```
 
 ### Deploy your project's infra
@@ -261,7 +279,82 @@ az webapp config appsettings set \
 
 > **Note:** Storage and OpenAI authentication use Managed Identity via RBAC (configured in your `infra/main.bicep`). No connection strings or API keys should be stored in app settings. Use `AZURE_STORAGE_ACCOUNT_NAME` (not connection strings) and `DefaultAzureCredential` in your application code.
 
-## Step 6: Deploy
+## Step 6: Set Up Monitoring
+
+All projects should connect to the shared Application Insights (`appi-hobby`) and define metric alerts against the shared Action Group (`ag-hobby-email`).
+
+### Application Insights
+
+Add `APPLICATIONINSIGHTS_CONNECTION_STRING` to your web app's settings (already shown in the Bicep template above). This enables:
+
+- **Request telemetry** — Every HTTP request is logged with URL, status code, duration, and client IP. This is the `requests` table in App Insights / Log Analytics.
+- **Dependency tracking** — Outbound calls to external APIs, databases, and storage are traced automatically.
+- **Exception logging** — Unhandled exceptions are captured with full stack traces.
+
+For Python apps on App Service, setting the connection string alone is **not sufficient** for Python 3.12+. You must also install the `azure-monitor-opentelemetry` SDK and call `configure_azure_monitor()` before creating your Flask app. This populates the `requests`, `dependencies`, and `exceptions` tables in App Insights.
+
+```python
+import os
+if os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
+    from azure.monitor.opentelemetry import configure_azure_monitor
+    configure_azure_monitor()
+
+from flask import Flask
+app = Flask(__name__)
+```
+
+> **Python 3.13 note:** Codeless auto-instrumentation (zero code changes) is in preview for Python ≤ 3.11 only. For Python 3.12+, the SDK approach above is required. Add `azure-monitor-opentelemetry>=1.6.0` to your `requirements.txt`.
+
+> **Cost:** Application Insights has a 5 GB/month free ingestion tier. The shared `appi-hobby` resource has a daily cap of 100 MB (configurable in `app-insights.bicep`) as a cost circuit-breaker. A typical hobby app generates 1–5 MB/day, well within the free tier.
+
+### Metric Alerts
+
+Create an `infra/modules/alerts.bicep` module in your project with metric alerts wired to the shared Action Group. Common alerts include:
+
+| Alert | Type | Description |
+|-------|------|-------------|
+| Health check | `metricAlerts` | App Service health probe falls below 100% |
+| HTTP 5xx | `metricAlerts` | Server errors exceed threshold |
+| Slow response | `metricAlerts` | Average response time exceeds threshold |
+| No data flowing | `scheduledQueryRules` | Zero matching requests in App Insights over a time window |
+
+**Platform metrics vs. App Insights queries:** Use `Microsoft.Insights/metricAlerts` for aggregate App Service metrics (5xx, health, response time). Use `Microsoft.Insights/scheduledQueryRules` when you need **per-URL filtering** — platform metrics are aggregate only and can't distinguish between endpoints. Scheduled query rules run KQL queries against App Insights and support filtering by URL, status code, or any telemetry field.
+
+Example scheduled query rule for detecting stopped data flow to a specific endpoint:
+
+```bicep
+resource noDataAlert 'Microsoft.Insights/scheduledQueryRules@2022-06-15' = {
+  name: 'alert-${webAppName}-no-data'
+  location: location  // must match resource group region, not 'global'
+  properties: {
+    severity: 2
+    enabled: true
+    scopes: [appInsightsId]
+    evaluationFrequency: 'PT15M'
+    windowSize: 'PT1H'
+    criteria: {
+      allOf: [
+        {
+          query: 'requests | where url endswith "/your-endpoint" and resultCode startswith "2"'
+          timeAggregation: 'Count'
+          operator: 'LessThanOrEqual'
+          threshold: 0
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    autoMitigate: true
+    actions: { actionGroups: [actionGroupId] }
+  }
+}
+```
+
+See individual project repos for complete working examples with all four alert types.
+
+## Step 7: Deploy
 
 Push to `main` and the GitHub Actions workflow will automatically deploy.
 

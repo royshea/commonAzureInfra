@@ -42,7 +42,13 @@ A single **App Service Plan (B1 Linux)** hosts all projects — static sites, Py
 
 ### Monitoring & alerting
 
-The shared infrastructure includes an **Action Group** (`ag-hobby-email`) that routes Azure Monitor alerts to email. Individual project repos define their own **metric alert rules** (e.g., HTTP 5xx, slow response, health check failures) and reference this shared Action Group by name. This keeps notification config centralized while alert logic stays with each app.
+The shared infrastructure includes **Application Insights** (`appi-hobby`) backed by **Log Analytics** (`law-hobby`) for per-request telemetry, and an **Action Group** (`ag-hobby-email`) that routes Azure Monitor alerts to email. A daily ingestion cap (default 100 MB/day) prevents cost surprises while staying well within the 5 GB/month free tier.
+
+Individual project repos wire up monitoring in two ways:
+
+1. **Application Insights connection** — Set `APPLICATIONINSIGHTS_CONNECTION_STRING` in app settings (via Bicep) to enable request/dependency/exception telemetry. No SDK or code changes needed for basic request logging on most runtimes.
+
+2. **Metric alert rules** — Each project defines its own alerts (e.g., HTTP 5xx, slow response, health check failures, data flow monitoring) and references the shared Action Group by name. Use `metricAlerts` for aggregate App Service metrics; use `scheduledQueryRules` for per-URL filtering against Application Insights.
 
 The email receivers are stored as a GitHub secret (`ALERT_EMAIL_RECEIVERS`) rather than committed to the repo, since this is a public repository.
 

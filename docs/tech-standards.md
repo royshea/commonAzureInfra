@@ -351,15 +351,21 @@ Static sites don't need health checks.
 
 ### Observability
 
-All apps should include the Application Insights connection string in their app settings to enable telemetry:
+All apps should connect to the shared **Application Insights** (`appi-hobby`) by including the connection string in their Bicep-managed app settings:
 
 ```bicep
-appSettings: [
-  {
-    name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-    value: '<appi-hobby-connection-string>'
-  }
-]
+{
+  name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+  value: appInsights.properties.ConnectionString
+}
 ```
 
-For Python apps, install `opencensus-ext-azure` or `azure-monitor-opentelemetry` to send traces and metrics. For Node.js apps, the App Service platform handles basic telemetry automatically.
+This single setting, combined with the `azure-monitor-opentelemetry` SDK (required for Python 3.12+), populates the `requests`, `dependencies`, and `exceptions` tables in App Insights. This telemetry powers:
+
+- **Azure Monitor metric alerts** for aggregate health (5xx, response time, health checks)
+- **Scheduled query rules** for per-URL alert filtering (e.g., "alert if zero POST /webhook requests in 1 hour")
+- **Log Analytics queries** for ad-hoc debugging and data exploration
+
+For deeper instrumentation (custom spans, manual dependency tracking), use the OpenTelemetry API directly. For Python 3.12+, the `azure-monitor-opentelemetry` SDK is **required** — codeless auto-instrumentation only supports Python ≤ 3.11. Call `configure_azure_monitor()` before creating your Flask app (see [new-project-guide.md](new-project-guide.md#application-insights) for the pattern).
+
+> **Cost:** The shared App Insights has a daily ingestion cap (default 100 MB) as a cost circuit-breaker. Typical hobby apps generate 1–5 MB/day, well within the 5 GB/month free tier.
