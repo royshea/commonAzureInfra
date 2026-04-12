@@ -309,6 +309,122 @@ These are point-in-time recommendations. Update to the latest stable versions wh
 
 ---
 
+## Git Workflow & Branch Management
+
+All projects on the shared platform follow a **branch + PR workflow**. Never push directly to `main`.
+
+### Standard Flow
+
+1. **Create a feature branch** from `main`:
+   ```bash
+   git checkout main && git pull
+   git checkout -b <type>/<description>
+   ```
+2. **Commit and push** to the branch:
+   ```bash
+   git push origin <branch-name>
+   ```
+3. **Open a PR** targeting `main` — CI runs automatically on the PR.
+4. **Verify CI passes** (lint, type check, tests), then merge.
+5. Deployment to Azure triggers automatically after CI passes on `main`.
+
+### Branch Naming
+
+| Prefix | Use |
+|--------|-----|
+| `feature/<description>` | New features |
+| `fix/<description>` | Bug fixes |
+| `audit/<finding-slug>` | Audit remediation |
+| `chore/<description>` | Maintenance (deps, docs, config) |
+
+### CI Gating
+
+Each project should have a CI workflow (`.github/workflows/ci.yml`) that runs on all pushes and PRs. The deploy workflow should trigger only after CI passes on `main`, using the `workflow_run` trigger:
+
+```yaml
+# ci.yml — runs validation on every push/PR
+name: CI
+on:
+  push:
+  pull_request:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # ... lint, type check, test
+```
+
+```yaml
+# deploy-app.yml — deploys only after CI succeeds on main
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    # ... deploy steps + post-deploy smoke test
+```
+
+This pattern ensures broken code never deploys, even without paid branch protection.
+
+> **Caveat:** Without branch protection rules (requires a paid GitHub plan for private repos), nothing prevents merging a PR before CI finishes. If that happens, broken code lands on `main` but the deploy simply won't fire (since `workflow_run` requires CI success). The code is still broken on `main` until a follow-up fix is merged. **Discipline replaces tooling here** — always wait for CI to pass before merging. For public repos, branch protection is free and should be enabled.
+
+### Post-Deploy Smoke Test
+
+Deploy workflows should include a health check after deployment to catch runtime failures:
+
+```yaml
+- name: Post-deploy smoke test
+  run: |
+    max_attempts=10
+    attempt=1
+    while [ $attempt -le $max_attempts ]; do
+      status=$(curl -s -o /dev/null -w "%{http_code}" https://<app-name>.azurewebsites.net/health || echo "000")
+      if [ "$status" = "200" ]; then
+        echo "✅ Smoke test passed"
+        exit 0
+      fi
+      sleep 15
+      attempt=$((attempt + 1))
+    done
+    echo "::error::❌ Smoke test failed"
+    exit 1
+```
+
+### GitHub Repository Settings
+
+Configure these settings on each project repo (Settings → General → Pull Requests):
+
+- ✅ **Automatically delete head branches** — cleans up merged branches on GitHub
+- For **paid plans** (Team/Enterprise or public repos): enable branch protection requiring the CI status check to pass before merging
+
+### Local Branch Cleanup
+
+After merging PRs, periodically clean up stale local branches:
+
+```bash
+# Switch to main and pull latest
+git checkout main && git pull
+
+# Delete a specific merged branch
+git branch -d <branch-name>
+
+# Batch-delete all merged local branches (bash)
+git branch --merged main | grep -v 'main' | xargs git branch -d
+
+# Batch-delete all merged local branches (PowerShell)
+git branch --merged main | Where-Object { $_ -notmatch 'main' } | ForEach-Object { git branch -d $_.Trim() }
+```
+
+### Copilot Agent Instructions
+
+Add an `AGENTS.md` file to each repo with a **mandatory Git workflow section** instructing Copilot to always use branches and PRs, never push directly to `main`.
+
+---
+
 ## General Practices
 
 ### Environment Configuration
