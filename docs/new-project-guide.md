@@ -264,20 +264,104 @@ jobs:
 
 Add GitHub secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` (see OIDC setup below).
 
-## Step 5: Configure App Settings
+## Step 5: Configure App Settings and Secrets
 
-Set non-secret configuration via app settings:
+### The appSettings replacement problem
 
-```bash
-az webapp config appsettings set \
-  --resource-group rg-shared-platform \
-  --name app-<yourproject> \
-  --settings \
-    AZURE_OPENAI_ENDPOINT="<your-openai-endpoint>" \
-    AZURE_OPENAI_DEPLOYMENT="<deployment-name>"
+> **⚠️ Critical:** The `web-app.bicep` module **replaces all `appSettings` on every deploy** — it does not merge. Any setting not declared in your `appSettings` array will be wiped. This means:
+>
+> - **Do NOT** set secrets manually via the Azure Portal or `az webapp config appsettings set` if your project uses CI-driven Bicep deploys — the next deploy will erase them.
+> - **All** app settings (including secrets) must be declared in your Bicep `appSettings` array so they survive every deployment.
+
+### Handling secrets in Bicep
+
+Use `@secure()` params in `main.bicep` combined with `readEnvironmentVariable()` in `main.bicepparam`. This keeps secrets out of source control while ensuring Bicep includes them on every deploy.
+
+**1. Declare secrets as `@secure()` params in `main.bicep`:**
+
+```bicep
+@secure()
+@minLength(1)
+@description('Flask session signing key')
+param secretKey string
+
+@secure()
+@minLength(1)
+@description('OAuth client secret')
+param oauthClientSecret string
+```
+
+**2. Include them in your `appSettings` array:**
+
+```bicep
+module webApp 'modules/web-app.bicep' = {
+  params: {
+    // ...
+    appSettings: [
+      { name: 'SECRET_KEY', value: secretKey }
+      { name: 'OAUTH_CLIENT_SECRET', value: oauthClientSecret }
+      // ... other non-secret settings ...
+    ]
+  }
+}
+```
+
+**3. Source them in `main.bicepparam` using `readEnvironmentVariable()`:**
+
+```bicep
+using 'main.bicep'
+
+param appServicePlanName = 'asp-hobby'
+param storageAccountName = 'sthobbyshared'
+
+// Secrets sourced from environment variables (set in CI from GitHub Actions secrets)
+param secretKey = readEnvironmentVariable('MYPROJECT_SECRET_KEY')
+param oauthClientSecret = readEnvironmentVariable('MYPROJECT_OAUTH_CLIENT_SECRET')
+```
+
+**4. Pass GitHub Actions secrets as `env:` on deploy steps:**
+
+```yaml
+      - name: Deploy Bicep
+        uses: azure/arm-deploy@v2
+        env:
+          MYPROJECT_SECRET_KEY: ${{ secrets.MYPROJECT_SECRET_KEY }}
+          MYPROJECT_OAUTH_CLIENT_SECRET: ${{ secrets.MYPROJECT_OAUTH_CLIENT_SECRET }}
+        with:
+          resourceGroupName: rg-shared-platform
+          template: infra/main.bicep
+          parameters: infra/main.bicepparam
+```
+
+> **Naming convention:** Prefix env var names with your project name (e.g., `RECIPES_SECRET_KEY`, `GOCLUB_GITHUB_CLIENT_SECRET`) to avoid collisions if multiple projects share a GitHub org or runner.
+
+### Non-secret configuration
+
+For settings that don't contain credentials, include them directly in your `appSettings` array:
+
+```bicep
+appSettings: [
+  { name: 'STORAGE_TYPE', value: 'azure' }
+  { name: 'AZURE_STORAGE_ACCOUNT_NAME', value: storageAccountName }
+  { name: 'APP_ENV', value: 'production' }
+]
 ```
 
 > **Note:** Storage and OpenAI authentication use Managed Identity via RBAC (configured in your `infra/main.bicep`). No connection strings or API keys should be stored in app settings. Use `AZURE_STORAGE_ACCOUNT_NAME` (not connection strings) and `DefaultAzureCredential` in your application code.
+
+### Manual bootstrap (first deploy only)
+
+For the initial deployment before CI is set up, pass secrets directly:
+
+```bash
+export MYPROJECT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+az deployment group create \
+  --resource-group rg-shared-platform \
+  --template-file infra/main.bicep \
+  --parameters infra/main.bicepparam
+```
+
+Then add the same value as a GitHub Actions secret so CI deploys can pick it up.
 
 ## Step 6: Set Up Monitoring
 
