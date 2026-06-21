@@ -249,6 +249,9 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Preview changes (What-If)
         uses: azure/CLI@v2
+        env:
+          MYPROJECT_SECRET_KEY: ${{ secrets.MYPROJECT_SECRET_KEY }}
+          MYPROJECT_OAUTH_CLIENT_SECRET: ${{ secrets.MYPROJECT_OAUTH_CLIENT_SECRET }}
         with:
           inlineScript: |
             az deployment group what-if \
@@ -256,11 +259,16 @@ jobs:
               --template-file infra/main.bicep \
               --parameters infra/main.bicepparam
       - uses: azure/arm-deploy@v2
+        env:
+          MYPROJECT_SECRET_KEY: ${{ secrets.MYPROJECT_SECRET_KEY }}
+          MYPROJECT_OAUTH_CLIENT_SECRET: ${{ secrets.MYPROJECT_OAUTH_CLIENT_SECRET }}
         with:
           resourceGroupName: rg-shared-platform
           template: infra/main.bicep
           parameters: infra/main.bicepparam
 ```
+
+> **Important:** If your project uses secrets via `readEnvironmentVariable()` in `main.bicepparam` (see Step 5), you **must** include the `env:` block on **both** the what-if and arm-deploy steps. The Bicep parameter file is compiled at preview time, so missing environment variables will break the what-if check before any actual deployment happens. Replace `MYPROJECT_*` with your project's actual secret names, and add the corresponding GitHub Actions secrets.
 
 Add GitHub secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` (see OIDC setup below).
 
@@ -334,6 +342,8 @@ param oauthClientSecret = readEnvironmentVariable('MYPROJECT_OAUTH_CLIENT_SECRET
 ```
 
 > **Naming convention:** Prefix env var names with your project name (e.g., `RECIPES_SECRET_KEY`, `GOCLUB_GITHUB_CLIENT_SECRET`) to avoid collisions if multiple projects share a GitHub org or runner.
+>
+> **⚠️ Deployment history caveat:** The `web-app.bicep` module's `appSettings` parameter is not marked `@secure()`, so secret values passed through it are **persisted in plaintext in Azure deployment history** (`az deployment group show`). The `@secure()` annotation on your top-level `main.bicep` params only scrubs them from the top-level deployment logs — not from nested module logs or the final App Service settings. For stronger protection, consider using [Key Vault references](https://learn.microsoft.com/en-us/azure/app-service/app-service-key-vault-references) (`@Microsoft.KeyVault(SecretUri=...)`) + web app Managed Identity with `get` access to the vault, rather than passing secrets as literal values. This keeps secrets out of deployment history entirely.
 
 ### Non-secret configuration
 
@@ -355,13 +365,16 @@ For the initial deployment before CI is set up, pass secrets directly:
 
 ```bash
 export MYPROJECT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+export MYPROJECT_OAUTH_CLIENT_SECRET="your-oauth-client-secret-from-provider"
 az deployment group create \
   --resource-group rg-shared-platform \
   --template-file infra/main.bicep \
   --parameters infra/main.bicepparam
 ```
 
-Then add the same value as a GitHub Actions secret so CI deploys can pick it up.
+> **Important:** Export **every** secret that your `main.bicepparam` reads via `readEnvironmentVariable()`. The Bicep compilation will fail if any required environment variable is missing.
+
+Then add the same values as GitHub Actions secrets so CI deploys can pick them up.
 
 ## Step 6: Set Up Monitoring
 
