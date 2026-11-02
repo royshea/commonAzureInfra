@@ -276,10 +276,13 @@ Add GitHub secrets: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID
 
 ### The appSettings replacement problem
 
-> **⚠️ Critical:** The `web-app.bicep` module **replaces all `appSettings` on every deploy** — it does not merge. Any setting not declared in your `appSettings` array will be wiped. This means:
+> **⚠️ Critical:** The `web-app.bicep` and `function-app.bicep` modules **replace all `appSettings` on every deploy** — they do not merge. Any setting not declared in your `appSettings` array will be wiped. This means:
 >
-> - **Do NOT** set secrets manually via the Azure Portal or `az webapp config appsettings set` if your project uses CI-driven Bicep deploys — the next deploy will erase them.
+> - **Do NOT** set secrets manually via the Azure Portal, `az webapp config appsettings set`, or `az functionapp config appsettings set` if your project uses CI-driven Bicep deploys — the next deploy will erase them.
 > - **All** app settings (including secrets) must be declared in your Bicep `appSettings` array so they survive every deployment.
+> - `function-app.bicep` always adds `AzureWebJobsStorage__accountName`, `FUNCTIONS_EXTENSION_VERSION`, and `FUNCTIONS_WORKER_RUNTIME` itself, so leave those out of your array. Everything else follows the same rule.
+>
+> The secrets pattern below uses `webApp` as its example, but it works the same way for `function-app.bicep`, which takes the same `appSettings` parameter.
 
 ### Handling secrets in Bicep
 
